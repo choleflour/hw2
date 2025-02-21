@@ -1,3 +1,5 @@
 *.o
 amazon
 hw2_tests/
+*.txt
+hw2_tests.tar.gz

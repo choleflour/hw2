@@ -9,7 +9,10 @@
 #include "db_parser.h"
 #include "product_parser.h"
 #include "util.h"
-
+#include "mydatastore.h"
+#include "book.h"
+#include "clothing.h"
+#include "movie.h"
 using namespace std;
 struct ProdNameSorter {
     bool operator()(Product* p1, Product* p2) {
@@ -17,6 +20,19 @@ struct ProdNameSorter {
     }
 };
 void displayProducts(vector<Product*>& hits);
+
+void printCart(const std::deque<Product*>& cart) {
+    int idx = 1;
+    for (const auto& product : cart) {
+        std::cout << "Item " << idx << std::endl; 
+        if (product) {
+            std::cout << product->displayString() << std::endl;
+        } else {
+            std::cout << "Null product pointer" << std::endl;
+        }
+        idx++;
+    }
+}
 
 int main(int argc, char* argv[])
 {
@@ -29,7 +45,7 @@ int main(int argc, char* argv[])
      * Declare your derived DataStore object here replacing
      *  DataStore type to your derived type
      ****************/
-    DataStore ds;
+    MyDataStore ds;
 
 
 
@@ -79,6 +95,7 @@ int main(int argc, char* argv[])
                 }
                 hits = ds.search(terms, 0);
                 displayProducts(hits);
+                ds.setResults(hits); //
             }
             else if ( cmd == "OR" ) {
                 string term;
@@ -89,6 +106,7 @@ int main(int argc, char* argv[])
                 }
                 hits = ds.search(terms, 1);
                 displayProducts(hits);
+                ds.setResults(hits); //
             }
             else if ( cmd == "QUIT") {
                 string filename;
@@ -98,11 +116,119 @@ int main(int argc, char* argv[])
                     ofile.close();
                 }
                 done = true;
+            } else if (cmd == "ADD") {
+                string username;
+                size_t hit_result_index;
+                if(ss >> username) {
+                    // if username is valid
+                    username = convToLower(username);
+                    vector<User *> users = ds.getUsers();
+                    bool userFound = false;
+                    for (size_t i = 0; i < users.size(); i ++) {
+                        if (users[i]->getName() == username) {
+                            userFound = true;
+                        }
+                    }
+                    if (!userFound) {
+                        cout << "Invalid request" << endl;
+                        continue;
+                    }
+                       
+                } else {
+                    cout << "Invalid request" << endl;
+                    continue;
+
+                }
+                if (ss >> hit_result_index) {
+                    if (hit_result_index < 1 || hit_result_index > hits.size()) {
+                        cout << "Invalid request" << endl;
+                        continue;
+                    }
+
+                } else {
+                    cout << "Invalid request" << endl;
+                    continue;
+                }
+                std::deque<Product *> &cart = ds.getCarts()[username];
+                Product *p = ds.getResults()[hit_result_index-1];
+                cart.push_back(p);
+                // printCart(cart);
+
+            } else if (cmd == "VIEWCART") {
+                string username;
+                if(ss >> username) {
+                    // if username is valid
+                    username = convToLower(username);
+                    vector<User *> users = ds.getUsers();
+                    bool userFound = false;
+                    for (size_t i = 0; i < users.size(); i ++) {
+                        if (users[i]->getName() == username) {
+                            userFound = true;
+                        }
+                    }
+                    if (!userFound) {
+                        cout << "Invalid username" << endl;
+                        continue;
+                    }
+                    std::deque<Product *> &cart = ds.getCarts()[username];
+                    printCart(cart);
+                       
+                } else {
+                    cout << "Invalid request" << endl;
+                    continue;
+
+                }
+            } else if (cmd == "BUYCART") {
+                string username;
+                User *user;
+                if (ss >> username)
+                {
+                    // if username is valid
+                    vector<User *> users = ds.getUsers();
+                    
+                    bool userFound = false;
+                    for (size_t i = 0; i < users.size(); i++)
+                    {
+                        if (users[i]->getName() == username)
+                        {
+                            userFound = true;
+                            user = users[i];
+                        }
+                    }
+                    if (!userFound)
+                    {
+                        cout << "Invalid username" << endl;
+                        continue;
+                    }
+                    // username is valid
+                    std::deque<Product *> cart = ds.getCarts()[username];
+                    double balance = user->getBalance();
+                    std::deque<Product *> copy = cart;
+                    std::deque<Product *> unableToBuy;
+                    while (!cart.empty()) {
+
+                        Product *curr = cart.front();
+                        double price = curr->getPrice();
+                        cart.pop_front();
+                        if (balance > price && curr->getQty() >= 1) {
+                            user->deductAmount(price);
+                            curr->subtractQty(1);
+                            
+                        } else {
+                            unableToBuy.push_back(curr);
+                        }
+                        balance = user->getBalance();
+
+                    }
+                    ds.getCarts()[username] = unableToBuy;
+
+                } else
+                {
+                    cout << "Invalid request" << endl;
+                    continue;
+                }
+                
             }
-	    /* Add support for other commands here */
-
-
-
 
             else {
                 cout << "Unknown command" << endl;
@@ -128,3 +254,5 @@ void displayProducts(vector<Product*>& hits)
         resultNo++;
     }
 }
+
+
